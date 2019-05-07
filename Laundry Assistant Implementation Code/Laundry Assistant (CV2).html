@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>Laundry Assistant</title>
+<title>Laundry Assistant (CV2)</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13118,9 +13118,11 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">cv2</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">render_template</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span><span class="n">jsonify</span>
+<span class="kn">from</span> <span class="nn">flask_cors</span> <span class="k">import</span> <span class="n">CORS</span>
+<span class="kn">from</span> <span class="nn">werkzeug.utils</span> <span class="k">import</span> <span class="n">secure_filename</span>
+<span class="kn">import</span> <span class="nn">cv2</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="k">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
 <span class="kn">import</span> <span class="nn">os.path</span>
 </pre></div>
 
@@ -13346,86 +13348,111 @@ div#notebook {
 <span class="n">templatesB</span><span class="p">,</span> <span class="n">typesB</span> <span class="o">=</span> <span class="n">create_database</span><span class="p">(</span><span class="s1">&#39;ClassB&#39;</span><span class="p">)</span>
 <span class="n">templatesC</span><span class="p">,</span> <span class="n">typesC</span> <span class="o">=</span> <span class="n">create_database</span><span class="p">(</span><span class="s1">&#39;ClassC&#39;</span><span class="p">)</span>
 
-<span class="c1">#here we read the input image</span>
-<span class="n">img_rgb</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s1">&#39;example5.jpg&#39;</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">img_gray</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
 
-<span class="c1">#here we apply threshold on the input image as a kind of pre-processing to facilitate the following operations.</span>
-<span class="n">ret1</span><span class="p">,</span><span class="n">img_rgb</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">,</span><span class="mi">180</span><span class="p">,</span><span class="mi">255</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">THRESH_BINARY</span><span class="p">)</span>
-<span class="c1">#here we crop the input image into small images.</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="n">cropim</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">cors</span> <span class="o">=</span> <span class="n">CORS</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
 
-<span class="c1">#we declare some global variables to be used below in implementation</span>
-<span class="n">maxthresh</span> <span class="o">=</span> <span class="o">.</span><span class="mi">09</span>
-<span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
-<span class="n">instruct</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
-<span class="n">set_inst</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">}</span>
-
-<span class="c1">#A message is sent to user to inform him that the image is recieved correctly and processing started.</span>
-<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Please wait for processing...!&#39;</span><span class="p">)</span>
-
-<span class="c1">#For each symbol detected by the crop fn, we calcualtes connected components to determine the class which the symbol belongs to.</span>
-<span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">symbols</span><span class="p">:</span>
-    <span class="n">_</span><span class="p">,</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">symbol</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="n">symbol</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
-    <span class="n">counter</span> <span class="o">=</span> <span class="n">count_connected</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
-    
-<span class="c1">#for each class we modify the inputs to the nect step</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&lt;=</span><span class="mi">7</span><span class="p">):</span>
-        <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesA</span>
-        <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesA</span>
-        <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassA&#39;</span>
-        <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.8</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.06</span>
-        <span class="c1">#print(&#39;in class A&#39;)</span>
-    <span class="k">elif</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&gt;=</span><span class="mi">7</span> <span class="ow">and</span> <span class="n">counter</span> <span class="o">&lt;=</span><span class="mi">10</span><span class="p">):</span>
-        <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesB</span>
-        <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesB</span>
-        <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassB&#39;</span>
-        <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.6</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
-        <span class="c1">#print(&#39;in class B&#39;)</span>
-    <span class="k">elif</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">):</span>
-        <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesC</span>
-        <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesC</span>
-        <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassC&#39;</span>
-        <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.6</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
-<span class="c1">#for each symbol, and for each threshold we try to match the detected symbol with our templates in database.</span>
-    <span class="k">for</span> <span class="n">thresh</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">maxthresh</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">step</span><span class="p">):</span>
+<span class="c1"># # @app.route(&#39;/upload&#39;)</span>
+<span class="c1"># # def upload():</span>
+<span class="c1"># #     return render_template(&#39;upload.html&#39;)</span>
+<span class="c1">#</span>
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s1">&#39;/uploader&#39;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="s1">&#39;POST&#39;</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">uploader</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span><span class="o">==</span><span class="s1">&#39;POST&#39;</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">files</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">secure_filename</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
         
-        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">templatesg</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
-            <span class="n">template1</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">templatesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
-            <span class="n">template</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">templatesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="mi">0</span><span class="p">)</span>
-            <span class="n">template</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">template</span><span class="p">,(</span><span class="n">w</span><span class="p">,</span><span class="n">h</span><span class="p">))</span>
-            
-            <span class="n">flag</span><span class="o">=</span><span class="mi">0</span>
-            <span class="n">flag2</span> <span class="o">=</span><span class="mi">0</span>
-            <span class="n">res</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">matchTemplate</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span><span class="n">template</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">TM_CCOEFF_NORMED</span><span class="p">)</span>
-            <span class="n">loc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span> <span class="n">res</span> <span class="o">&gt;=</span> <span class="n">thresh</span><span class="p">)</span>
+<span class="c1">#here we read the input image</span>
+<span class="c1">#img_rgb = cv2.imread(&#39;example5.jpg&#39;,1)</span>
+        <span class="n">img_rgb</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">img_gray</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
 
-            <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">loc</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
-                <span class="n">cv2</span><span class="o">.</span><span class="n">rectangle</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">pt</span><span class="p">,</span> <span class="p">(</span><span class="n">pt</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">w</span><span class="p">,</span> <span class="n">pt</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
-                <span class="c1">#if symbol is matched with any of database templates, set the flags = 1 </span>
-                <span class="n">flag</span><span class="o">=</span><span class="mi">1</span>
-                <span class="n">flag2</span><span class="o">=</span><span class="mi">1</span>
-                
+        <span class="c1">#here we apply threshold on the input image as a kind of pre-processing to facilitate the following operations.</span>
+        <span class="n">ret1</span><span class="p">,</span><span class="n">img_rgb</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">,</span><span class="mi">180</span><span class="p">,</span><span class="mi">255</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">THRESH_BINARY</span><span class="p">)</span>
+        <span class="c1">#here we crop the input image into small images.</span>
+        <span class="n">symbols</span> <span class="o">=</span> <span class="n">cropim</span><span class="p">(</span><span class="n">img_rgb</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">flag</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="c1">#if flag = 1, therefore the symbol is matched, so then we get the instruction from the dictionay and add it to the set of instruction that would be send to the user as an output.</span>
-                <span class="n">instruct</span> <span class="o">=</span> <span class="n">get_inastruction</span><span class="p">(</span><span class="n">typesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="n">Classg</span><span class="p">)</span>
-                <span class="n">set_inst</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">instruct</span><span class="p">)</span>
-                
-                <span class="k">break</span>
-            
-            <span class="c1">#else:</span>
-                <span class="c1">#print(&#39;not detected&#39;)</span>
+        <span class="c1">#we declare some global variables to be used below in implementation</span>
+        <span class="n">maxthresh</span> <span class="o">=</span> <span class="o">.</span><span class="mi">09</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
+        <span class="n">instruct</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">set_inst</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">}</span>
 
-        <span class="k">if</span> <span class="n">flag2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">break</span>
+        <span class="c1">#A message is sent to user to inform him that the image is recieved correctly and processing started.</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Please wait for processing...!&#39;</span><span class="p">)</span>
 
-<span class="k">for</span> <span class="n">inst</span> <span class="ow">in</span> <span class="n">set_inst</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">inst</span><span class="p">)</span>
+        <span class="c1">#For each symbol detected by the crop fn, we calcualtes connected components to determine the class which the symbol belongs to.</span>
+        <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">symbols</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span><span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">symbol</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">symbol</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2GRAY</span><span class="p">)</span>
+            <span class="n">counter</span> <span class="o">=</span> <span class="n">count_connected</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
+
+        <span class="c1">#for each class we modify the inputs to the nect step</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&lt;=</span><span class="mi">7</span><span class="p">):</span>
+                <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesA</span>
+                <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesA</span>
+                <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassA&#39;</span>
+                <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.8</span>
+                <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.06</span>
+                <span class="c1">#print(&#39;in class A&#39;)</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&gt;=</span><span class="mi">7</span> <span class="ow">and</span> <span class="n">counter</span> <span class="o">&lt;=</span><span class="mi">10</span><span class="p">):</span>
+                <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesB</span>
+                <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesB</span>
+                <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassB&#39;</span>
+                <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.6</span>
+                <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
+                <span class="c1">#print(&#39;in class B&#39;)</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">counter</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">):</span>
+                <span class="n">templatesg</span> <span class="o">=</span> <span class="n">templatesC</span>
+                <span class="n">typesg</span> <span class="o">=</span> <span class="n">typesC</span>
+                <span class="n">Classg</span> <span class="o">=</span> <span class="s1">&#39;ClassC&#39;</span>
+                <span class="n">maxthresh</span> <span class="o">=</span> <span class="mf">0.6</span>
+                <span class="n">step</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.1</span>
+        <span class="c1">#for each symbol, and for each threshold we try to match the detected symbol with our templates in database.</span>
+            <span class="k">for</span> <span class="n">thresh</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">maxthresh</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">step</span><span class="p">):</span>
+
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">templatesg</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">template1</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">templatesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">template</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">templatesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="n">template</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">template</span><span class="p">,(</span><span class="n">w</span><span class="p">,</span><span class="n">h</span><span class="p">))</span>
+
+                    <span class="n">flag</span><span class="o">=</span><span class="mi">0</span>
+                    <span class="n">flag2</span> <span class="o">=</span><span class="mi">0</span>
+                    <span class="n">res</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">matchTemplate</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span><span class="n">template</span><span class="p">,</span><span class="n">cv2</span><span class="o">.</span><span class="n">TM_CCOEFF_NORMED</span><span class="p">)</span>
+                    <span class="n">loc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span> <span class="n">res</span> <span class="o">&gt;=</span> <span class="n">thresh</span><span class="p">)</span>
+
+                    <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">loc</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                        <span class="n">cv2</span><span class="o">.</span><span class="n">rectangle</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">pt</span><span class="p">,</span> <span class="p">(</span><span class="n">pt</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">w</span><span class="p">,</span> <span class="n">pt</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+                        <span class="c1">#if symbol is matched with any of database templates, set the flags = 1 </span>
+                        <span class="n">flag</span><span class="o">=</span><span class="mi">1</span>
+                        <span class="n">flag2</span><span class="o">=</span><span class="mi">1</span>
+
+
+                    <span class="k">if</span> <span class="n">flag</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="c1">#if flag = 1, therefore the symbol is matched, so then we get the instruction from the dictionay and add it to the set of instruction that would be send to the user as an output.</span>
+                        <span class="n">instruct</span> <span class="o">=</span> <span class="n">get_inastruction</span><span class="p">(</span><span class="n">typesg</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="n">Classg</span><span class="p">)</span>
+                        <span class="n">set_inst</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">instruct</span><span class="p">)</span>
+
+                        <span class="k">break</span>
+
+                    <span class="c1">#else:</span>
+                        <span class="c1">#print(&#39;not detected&#39;)</span>
+
+                <span class="k">if</span> <span class="n">flag2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="k">break</span>
+
+        <span class="n">finalResult</span><span class="o">=</span><span class="s1">&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">inst</span> <span class="ow">in</span> <span class="n">set_inst</span><span class="p">:</span>
+            <span class="n">finalResult</span> <span class="o">=</span><span class="n">finalResult</span> <span class="o">+</span> <span class="n">inst</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">finalResult</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;done man&#39;</span><span class="p">)</span>
+
+        <span class="c1">#//////////////////////////////////////////////////</span>
+        <span class="k">return</span> <span class="n">jsonify</span><span class="p">(</span>
+        <span class="n">success</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">message</span><span class="o">=</span><span class="n">finalResult</span>
+         <span class="p">)</span>
+<span class="c1">#if __name__ ==&#39;__main__&#39;:</span>
 </pre></div>
 
     </div>

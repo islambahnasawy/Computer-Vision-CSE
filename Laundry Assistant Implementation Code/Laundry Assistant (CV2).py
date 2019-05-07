@@ -4,9 +4,11 @@
 # In[1]:
 
 
+from flask import Flask, render_template, request,jsonify
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 import os.path
 
 
@@ -190,86 +192,111 @@ templatesA, typesA = create_database('ClassA')
 templatesB, typesB = create_database('ClassB')
 templatesC, typesC = create_database('ClassC')
 
-#here we read the input image
-img_rgb = cv2.imread('example5.jpg',1)
-img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
 
-#here we apply threshold on the input image as a kind of pre-processing to facilitate the following operations.
-ret1,img_rgb = cv2.threshold(img_rgb,180,255,cv2.THRESH_BINARY)
-#here we crop the input image into small images.
-symbols = cropim(img_rgb)
+app = Flask(__name__)
+cors = CORS(app)
 
-#we declare some global variables to be used below in implementation
-maxthresh = .09
-step = -0.1
-instruct = ''
-set_inst = {""}
-
-#A message is sent to user to inform him that the image is recieved correctly and processing started.
-print('Please wait for processing...!')
-
-#For each symbol detected by the crop fn, we calcualtes connected components to determine the class which the symbol belongs to.
-for symbol in symbols:
-    _,w, h = symbol.shape[::-1]
-    symbol = cv2.cvtColor(symbol, cv2.COLOR_BGR2GRAY)
-    counter = count_connected(symbol)
-    
-#for each class we modify the inputs to the nect step
-    if (counter <=7):
-        templatesg = templatesA
-        typesg = typesA
-        Classg = 'ClassA'
-        maxthresh = 0.8
-        step = -0.06
-        #print('in class A')
-    elif (counter >=7 and counter <=10):
-        templatesg = templatesB
-        typesg = typesB
-        Classg = 'ClassB'
-        maxthresh = 0.6
-        step = -0.1
-        #print('in class B')
-    elif (counter > 10):
-        templatesg = templatesC
-        typesg = typesC
-        Classg = 'ClassC'
-        maxthresh = 0.6
-        step = -0.1
-#for each symbol, and for each threshold we try to match the detected symbol with our templates in database.
-    for thresh in np.arange(maxthresh, 0.2, step):
+# # @app.route('/upload')
+# # def upload():
+# #     return render_template('upload.html')
+#
+@app.route('/uploader', methods=['GET', 'POST'])
+def uploader():
+    if request.method=='POST':
+        f=request.files['file']
+        f.save(secure_filename(f.filename))
         
-        for j in range(0, len(templatesg)-1, 1):
-            template1 = cv2.imread(templatesg[j],1)
-            template = cv2.imread(templatesg[j],0)
-            template = cv2.resize(template,(w,h))
-            
-            flag=0
-            flag2 =0
-            res = cv2.matchTemplate(symbol,template,cv2.TM_CCOEFF_NORMED)
-            loc = np.where( res >= thresh)
+#here we read the input image
+#img_rgb = cv2.imread('example5.jpg',1)
+        img_rgb = cv2.imread(f.filename, 1)
+        img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
 
-            for pt in zip(*loc[::-1]):
-                cv2.rectangle(symbol, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
-                #if symbol is matched with any of database templates, set the flags = 1 
-                flag=1
-                flag2=1
-                
+        #here we apply threshold on the input image as a kind of pre-processing to facilitate the following operations.
+        ret1,img_rgb = cv2.threshold(img_rgb,180,255,cv2.THRESH_BINARY)
+        #here we crop the input image into small images.
+        symbols = cropim(img_rgb)
 
-            if flag == 1:
-                #if flag = 1, therefore the symbol is matched, so then we get the instruction from the dictionay and add it to the set of instruction that would be send to the user as an output.
-                instruct = get_inastruction(typesg[j],Classg)
-                set_inst.add(instruct)
-                
-                break
-            
-            #else:
-                #print('not detected')
+        #we declare some global variables to be used below in implementation
+        maxthresh = .09
+        step = -0.1
+        instruct = ''
+        set_inst = {""}
 
-        if flag2 == 1:
-            break
+        #A message is sent to user to inform him that the image is recieved correctly and processing started.
+        print('Please wait for processing...!')
 
-for inst in set_inst:
-    print(inst)
+        #For each symbol detected by the crop fn, we calcualtes connected components to determine the class which the symbol belongs to.
+        for symbol in symbols:
+            _,w, h = symbol.shape[::-1]
+            symbol = cv2.cvtColor(symbol, cv2.COLOR_BGR2GRAY)
+            counter = count_connected(symbol)
+
+        #for each class we modify the inputs to the nect step
+            if (counter <=7):
+                templatesg = templatesA
+                typesg = typesA
+                Classg = 'ClassA'
+                maxthresh = 0.8
+                step = -0.06
+                #print('in class A')
+            elif (counter >=7 and counter <=10):
+                templatesg = templatesB
+                typesg = typesB
+                Classg = 'ClassB'
+                maxthresh = 0.6
+                step = -0.1
+                #print('in class B')
+            elif (counter > 10):
+                templatesg = templatesC
+                typesg = typesC
+                Classg = 'ClassC'
+                maxthresh = 0.6
+                step = -0.1
+        #for each symbol, and for each threshold we try to match the detected symbol with our templates in database.
+            for thresh in np.arange(maxthresh, 0.2, step):
+
+                for j in range(0, len(templatesg)-1, 1):
+                    template1 = cv2.imread(templatesg[j],1)
+                    template = cv2.imread(templatesg[j],0)
+                    template = cv2.resize(template,(w,h))
+
+                    flag=0
+                    flag2 =0
+                    res = cv2.matchTemplate(symbol,template,cv2.TM_CCOEFF_NORMED)
+                    loc = np.where( res >= thresh)
+
+                    for pt in zip(*loc[::-1]):
+                        cv2.rectangle(symbol, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
+                        #if symbol is matched with any of database templates, set the flags = 1 
+                        flag=1
+                        flag2=1
+
+
+                    if flag == 1:
+                        #if flag = 1, therefore the symbol is matched, so then we get the instruction from the dictionay and add it to the set of instruction that would be send to the user as an output.
+                        instruct = get_inastruction(typesg[j],Classg)
+                        set_inst.add(instruct)
+
+                        break
+
+                    #else:
+                        #print('not detected')
+
+                if flag2 == 1:
+                    break
+
+        finalResult=''
+        for inst in set_inst:
+            finalResult =finalResult + inst + "/"
+        print(finalResult)
+        print('done man')
+
+        #//////////////////////////////////////////////////
+        return jsonify(
+        success=True,
+        message=finalResult
+         )
+#if __name__ =='__main__':
 
 
 # In[ ]:
